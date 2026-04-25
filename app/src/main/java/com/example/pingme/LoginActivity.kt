@@ -1,5 +1,6 @@
 package com.example.pingme
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -12,19 +13,21 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.input.ImeAction
-import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
-import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.input.*
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun LoginScreen(
-    onLoginClick: (String, String) -> Unit,
+    onLoginSuccess: () -> Unit,
     onSignUpClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
     var passwordVisible by remember { mutableStateOf(false) }
@@ -44,9 +47,7 @@ fun LoginScreen(
         contentAlignment = Alignment.Center
     ) {
         Card(
-            modifier = Modifier
-                .fillMaxWidth()
-                .wrapContentHeight(),
+            modifier = Modifier.fillMaxWidth(),
             shape = RoundedCornerShape(24.dp),
             colors = cardColors(
                 containerColor = Color.White.copy(alpha = 0.96f)
@@ -54,9 +55,7 @@ fun LoginScreen(
             elevation = CardDefaults.cardElevation(defaultElevation = 8.dp)
         ) {
             Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(24.dp),
+                modifier = Modifier.padding(24.dp),
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {
 
@@ -81,8 +80,6 @@ fun LoginScreen(
                     value = email,
                     onValueChange = { email = it },
                     label = { Text("Email") },
-                    placeholder = { Text("Enter your email") },
-                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
                     keyboardOptions = KeyboardOptions(
@@ -97,66 +94,72 @@ fun LoginScreen(
                     value = password,
                     onValueChange = { password = it },
                     label = { Text("Password") },
-                    placeholder = { Text("Enter your password") },
-                    singleLine = true,
                     modifier = Modifier.fillMaxWidth(),
                     shape = RoundedCornerShape(14.dp),
-                    visualTransformation = if (passwordVisible) {
+                    visualTransformation = if (passwordVisible)
                         VisualTransformation.None
-                    } else {
-                        PasswordVisualTransformation()
-                    },
+                    else
+                        PasswordVisualTransformation(),
                     trailingIcon = {
                         Text(
                             text = if (passwordVisible) "Hide" else "Show",
-                            color = Color(0xFF1565C0),
-                            fontWeight = FontWeight.SemiBold,
                             modifier = Modifier.clickable {
                                 passwordVisible = !passwordVisible
-                            }
+                            },
+                            color = Color(0xFF1565C0)
                         )
-                    },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
-                        imeAction = ImeAction.Done
-                    )
+                    }
                 )
 
                 Spacer(modifier = Modifier.height(24.dp))
 
                 Button(
-                    onClick = { onLoginClick(email, password) },
+                    onClick = {
+                        if (email.isBlank() || password.isBlank()) {
+                            Toast.makeText(
+                                context,
+                                "Please fill all fields",
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else {
+                            auth.signInWithEmailAndPassword(email, password)
+                                .addOnCompleteListener { task ->
+                                    if (task.isSuccessful) {
+                                        Toast.makeText(
+                                            context,
+                                            "Login Successful",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+
+                                        onLoginSuccess() // 🔥 navigate to events
+                                    } else {
+                                        Toast.makeText(
+                                            context,
+                                            task.exception?.message ?: "Login Failed",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
+                                }
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .height(52.dp),
                     shape = RoundedCornerShape(14.dp),
                     colors = ButtonDefaults.buttonColors(
-                        containerColor = Color(0xFF1565C0),
-                        contentColor = Color.White
+                        containerColor = Color(0xFF1565C0)
                     )
                 ) {
-                    Text(
-                        text = "Login",
-                        fontSize = 18.sp,
-                        fontWeight = FontWeight.Bold
-                    )
+                    Text("Login", fontSize = 18.sp, fontWeight = FontWeight.Bold)
                 }
 
                 Spacer(modifier = Modifier.height(18.dp))
 
-                Row(
-                    horizontalArrangement = Arrangement.Center,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text(
-                        text = "Don’t have an account? ",
-                        color = Color.DarkGray,
-                        fontSize = 14.sp
-                    )
+                Row {
+                    Text("Don’t have an account? ")
                     Text(
                         text = "Sign Up",
                         color = Color(0xFFFF9800),
-                        fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         modifier = Modifier.clickable {
                             onSignUpClick()
