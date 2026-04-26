@@ -1,5 +1,6 @@
 package com.example.pingme
 
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
@@ -11,17 +12,22 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
 
 @Composable
 fun SignupScreen(
-    onSignupClick: (String, String, String, String) -> Unit,
+    onSignupSuccess: () -> Unit,
     onLoginClick: () -> Unit
 ) {
+    val context = LocalContext.current
+    val auth = FirebaseAuth.getInstance()
+
     var name by remember { mutableStateOf("") }
     var email by remember { mutableStateOf("") }
     var password by remember { mutableStateOf("") }
@@ -125,7 +131,58 @@ fun SignupScreen(
 
                 Button(
                     onClick = {
-                        onSignupClick(name, email, password, confirmPassword)
+                        when {
+                            name.isBlank() || email.isBlank() || password.isBlank() || confirmPassword.isBlank() -> {
+                                Toast.makeText(
+                                    context,
+                                    "Please fill all fields",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            password.length < 6 -> {
+                                Toast.makeText(
+                                    context,
+                                    "Password must be at least 6 characters",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            password != confirmPassword -> {
+                                Toast.makeText(
+                                    context,
+                                    "Passwords do not match",
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            else -> {
+                                auth.createUserWithEmailAndPassword(email, password)
+                                    .addOnCompleteListener { task ->
+                                        if (task.isSuccessful) {
+                                            auth.currentUser?.updateProfile(
+                                                com.google.firebase.auth.UserProfileChangeRequest.Builder()
+                                                    .setDisplayName(name)
+                                                    .build()
+                                            )
+
+                                            Toast.makeText(
+                                                context,
+                                                "Signup Successful",
+                                                Toast.LENGTH_SHORT
+                                            ).show()
+
+                                            onSignupSuccess()
+                                        } else {
+                                            Toast.makeText(
+                                                context,
+                                                task.exception?.message ?: "Signup Failed",
+                                                Toast.LENGTH_LONG
+                                            ).show()
+                                        }
+                                    }
+                            }
+                        }
                     },
                     modifier = Modifier
                         .fillMaxWidth()
