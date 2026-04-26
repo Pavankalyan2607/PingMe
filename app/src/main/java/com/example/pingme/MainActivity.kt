@@ -76,11 +76,9 @@ fun AppNavigation(navController: NavHostController) {
 
         composable("login") {
             LoginScreen(
-                onLoginClick = { email, password ->
-                    if (email.isNotBlank() && password.isNotBlank()) {
-                        navController.navigate("events") {
-                            popUpTo("login") { inclusive = true }
-                        }
+                onLoginSuccess = {
+                    navController.navigate("events") {
+                        popUpTo("login") { inclusive = true }
                     }
                 },
                 onSignUpClick = {
@@ -91,17 +89,9 @@ fun AppNavigation(navController: NavHostController) {
 
         composable("signup") {
             SignupScreen(
-                onSignupClick = { name, email, password, confirmPassword ->
-                    if (
-                        name.isNotBlank() &&
-                        email.isNotBlank() &&
-                        password.isNotBlank() &&
-                        confirmPassword.isNotBlank() &&
-                        password == confirmPassword
-                    ) {
-                        navController.navigate("events") {
-                            popUpTo("signup") { inclusive = true }
-                        }
+                onSignupSuccess = {
+                    navController.navigate("events") {
+                        popUpTo("signup") { inclusive = true }
                     }
                 },
                 onLoginClick = {
