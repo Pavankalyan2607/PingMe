@@ -2,11 +2,12 @@ package com.example.pingme
 
 import android.app.DatePickerDialog
 import android.app.TimePickerDialog
+import android.widget.Toast
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.material3.CardDefaults.cardColors
 import androidx.compose.runtime.*
@@ -18,6 +19,8 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import java.util.Calendar
 
 @OptIn(ExperimentalMaterial3Api::class)
@@ -29,10 +32,14 @@ fun AddEventScreen(
     val context = LocalContext.current
     val calendar = Calendar.getInstance()
 
+    val auth = FirebaseAuth.getInstance()
+    val db = FirebaseFirestore.getInstance()
+
     var title by remember { mutableStateOf("") }
     var date by remember { mutableStateOf("") }
     var time by remember { mutableStateOf("") }
     var notes by remember { mutableStateOf("") }
+    var isSaving by remember { mutableStateOf(false) }
 
     val datePickerDialog = DatePickerDialog(
         context,
@@ -79,13 +86,16 @@ fun AddEventScreen(
                 TopAppBar(
                     title = {
                         Text(
-                            "Add Event",
+                            text = "Add Event",
                             color = Color.White,
                             fontWeight = FontWeight.Bold
                         )
                     },
                     navigationIcon = {
-                        TextButton(onClick = onBackClick) {
+                        TextButton(
+                            onClick = onBackClick,
+                            enabled = !isSaving
+                        ) {
                             Text("Back", color = Color.White)
                         }
                     },
@@ -131,7 +141,8 @@ fun AddEventScreen(
                             onValueChange = { title = it },
                             label = { Text("Event Title") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSaving
                         )
 
                         OutlinedTextField(
@@ -140,7 +151,8 @@ fun AddEventScreen(
                             readOnly = true,
                             label = { Text("Date") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSaving
                         )
 
                         Button(
@@ -150,7 +162,8 @@ fun AddEventScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFFF9800),
                                 contentColor = Color.White
-                            )
+                            ),
+                            enabled = !isSaving
                         ) {
                             Text("Select Date")
                         }
@@ -161,7 +174,8 @@ fun AddEventScreen(
                             readOnly = true,
                             label = { Text("Time") },
                             modifier = Modifier.fillMaxWidth(),
-                            shape = RoundedCornerShape(12.dp)
+                            shape = RoundedCornerShape(12.dp),
+                            enabled = !isSaving
                         )
 
                         Button(
@@ -171,7 +185,8 @@ fun AddEventScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFFFF9800),
                                 contentColor = Color.White
-                            )
+                            ),
+                            enabled = !isSaving
                         ) {
                             Text("Select Time")
                         }
@@ -182,21 +197,70 @@ fun AddEventScreen(
                             label = { Text("Notes (Optional)") },
                             modifier = Modifier.fillMaxWidth(),
                             shape = RoundedCornerShape(12.dp),
-                            minLines = 3
+                            minLines = 3,
+                            enabled = !isSaving
                         )
 
                         Button(
                             onClick = {
-                                if (title.isNotBlank() && date.isNotBlank() && time.isNotBlank()) {
-                                    onSaveClick(
-                                        EventItem(
-                                            title = title,
-                                            date = date,
-                                            time = time,
-                                            notes = notes
-                                        )
-                                    )
+                                if (title.isBlank() || date.isBlank() || time.isBlank()) {
+                                    Toast.makeText(
+                                        context,
+                                        "Please fill title, date, and time",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
                                 }
+
+                                val currentUser = auth.currentUser
+                                if (currentUser == null) {
+                                    Toast.makeText(
+                                        context,
+                                        "Please log in first",
+                                        Toast.LENGTH_SHORT
+                                    ).show()
+                                    return@Button
+                                }
+
+                                isSaving = true
+
+                                val event = hashMapOf(
+                                    "title" to title,
+                                    "date" to date,
+                                    "time" to time,
+                                    "notes" to notes,
+                                    "userId" to currentUser.uid,
+                                    "createdAt" to System.currentTimeMillis()
+                                )
+
+                                db.collection("events")
+                                    .add(event)
+                                    .addOnSuccessListener {
+                                        Toast.makeText(
+                                            context,
+                                            "Event saved to Firestore",
+                                            Toast.LENGTH_SHORT
+                                        ).show()
+
+                                        onSaveClick(
+                                            EventItem(
+                                                title = title,
+                                                date = date,
+                                                time = time,
+                                                notes = notes
+                                            )
+                                        )
+
+                                        isSaving = false
+                                    }
+                                    .addOnFailureListener { e ->
+                                        isSaving = false
+                                        Toast.makeText(
+                                            context,
+                                            "Failed: ${e.message}",
+                                            Toast.LENGTH_LONG
+                                        ).show()
+                                    }
                             },
                             modifier = Modifier
                                 .fillMaxWidth()
@@ -205,10 +269,11 @@ fun AddEventScreen(
                             colors = ButtonDefaults.buttonColors(
                                 containerColor = Color(0xFF1565C0),
                                 contentColor = Color.White
-                            )
+                            ),
+                            enabled = !isSaving
                         ) {
                             Text(
-                                text = "Save Event",
+                                text = if (isSaving) "Saving..." else "Save Event",
                                 fontSize = 18.sp,
                                 fontWeight = FontWeight.Bold
                             )
