@@ -242,6 +242,12 @@ fun AddEventScreen(
                                             Toast.LENGTH_SHORT
                                         ).show()
 
+                                        NotificationHelper.showEventSavedNotification(
+                                            context = context,
+                                            title = "Reminder Saved",
+                                            message = "$title on $date at $time"
+                                        )
+
                                         onSaveClick(
                                             EventItem(
                                                 title = title,
