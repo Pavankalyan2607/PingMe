@@ -20,6 +20,8 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import com.example.pingme.ui.theme.PingMeTheme
+import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FirebaseFirestore
 import kotlinx.coroutines.delay
 
 class MainActivity : ComponentActivity() {
@@ -41,22 +43,7 @@ class MainActivity : ComponentActivity() {
 fun AppNavigation(navController: NavHostController) {
 
     var events by remember {
-        mutableStateOf(
-            listOf(
-                EventItem(
-                    title = "Project Submission",
-                    date = "20/03/2026",
-                    time = "10:00 AM",
-                    notes = "Submit PingMe ICA"
-                ),
-                EventItem(
-                    title = "Team Meeting",
-                    date = "22/03/2026",
-                    time = "2:30 PM",
-                    notes = "Discuss sprint progress"
-                )
-            )
-        )
+        mutableStateOf<List<EventItem>>(emptyList())
     }
 
     NavHost(
@@ -101,7 +88,28 @@ fun AppNavigation(navController: NavHostController) {
         }
 
         composable("events") {
-            EventsScreen(
+            val currentUser = FirebaseAuth.getInstance().currentUser
+
+            LaunchedEffect(currentUser?.uid) {
+                if (currentUser != null) {
+                    FirebaseFirestore.getInstance()
+                        .collection("events")
+                        .whereEqualTo("userId", currentUser.uid)
+                        .get()
+                        .addOnSuccessListener { result ->
+                            events = result.documents.map { doc ->
+                                EventItem(
+                                    title = doc.getString("title") ?: "",
+                                    date = doc.getString("date") ?: "",
+                                    time = doc.getString("time") ?: "",
+                                    notes = doc.getString("notes") ?: ""
+                                )
+                            }
+                        }
+                }
+            }
+
+            MainEventsWithBottomNav(
                 events = events,
                 onAddEventClick = {
                     navController.navigate("add_event")
@@ -109,6 +117,13 @@ fun AppNavigation(navController: NavHostController) {
                 onDeleteClick = { index ->
                     events = events.toMutableList().apply {
                         removeAt(index)
+                    }
+                },
+                onLogoutClick = {
+                    FirebaseAuth.getInstance().signOut()
+                    events = emptyList()
+                    navController.navigate("login") {
+                        popUpTo(0)
                     }
                 }
             )
